@@ -1,54 +1,53 @@
 #!/usr/bin/python3
+"""A script that reads stdin line by line and computes metrics
+"""
 
-import sys
-
-
-def print_msg(dict_sc, total_file_size):
-    """
-    Method to print
-    Args:
-        dict_sc: dict of status codes
-        total_file_size: total of the file
-    Returns:
-        Nothing
-    """
-
-    print("File size: {}".format(total_file_size))
-    for key, val in sorted(dict_sc.items()):
-        if val != 0:
-            print("{}: {}".format(key, val))
+import re
+from sys import stdin, stdout
 
 
-total_file_size = 0
-code = 0
-counter = 0
-dict_sc = {"200": 0,
-           "301": 0,
-           "400": 0,
-           "401": 0,
-           "403": 0,
-           "404": 0,
-           "405": 0,
-           "500": 0}
+def extract_input(input_line):
+    fp = (
+        r'\s*(?P<ip>\S+)\s*',
+        r'\s*\[(?P<date>\d+\-\d+\-\d+ \d+:\d+:\d+\.\d+)\]',
+        r'\s*"(?P<request>[^"]*)"\s*',
+        r'\s*(?P<status_code>\S+)',
+        r'\s*(?P<file_size>\d+)'
+    )
+    info = {
+        'status_code': 0,
+        'file_size': 0,
+    }
+    log_fmt = '{}\\-{}{}{}{}\\s*'.format(fp[0], fp[1], fp[2], fp[3], fp[4])
+    resp_match = re.fullmatch(log_fmt, input_line)
+    if resp_match is not None:
+        status_code = resp_match.group('status_code')
+        file_size = int(resp_match.group('file_size'))
+        info['status_code'] = status_code
+        info['file_size'] = file_size
+    return info
+
 
 try:
-    for line in sys.stdin:
-        parsed_line = line.split()  # ✄ trimming
-        parsed_line = parsed_line[::-1]  # inverting
+    num = 0
+    status_dict = {}
+    total_size = 0
+    while True:
+        line = input()
 
-        if len(parsed_line) > 2:
-            counter += 1
-
-            if counter <= 10:
-                total_file_size += int(parsed_line[0])  # file size
-                code = parsed_line[1]  # status code
-
-                if (code in dict_sc.keys()):
-                    dict_sc[code] += 1
-
-            if (counter == 10):
-                print_msg(dict_sc, total_file_size)
-                counter = 0
-
-finally:
-    print_msg(dict_sc, total_file_size)
+        info = extract_input(line)
+        num += 1
+        total_size += int(info['file_size'])
+        status = info['status_code']
+        if status in status_dict:
+            status_dict[status] += 1
+        else:
+            status_dict[status] = 1
+        if num % 10 == 0:
+            print("File size: {}".format(total_size), flush=True)
+            for key, value in sorted(status_dict.items()):
+                print(f"{key}: {value}", flush=True)
+except (KeyboardInterrupt, EOFError):
+    print(f"File size: {total_size}", flush=True)
+    for key, value in sorted(status_dict.items()):
+        print(f"{key}: {value}", flush=True)
